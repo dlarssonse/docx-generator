@@ -1,0 +1,8 @@
+{
+    "first_name": "David",
+    "last_name": "Larsson",
+    "mps": [
+      { "name": "MP1", "position": "Position 1" },
+      { "name": "MP2", "position": "Position 2" }
+    ]
+}
