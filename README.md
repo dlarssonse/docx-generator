@@ -9,7 +9,8 @@ This is just a compilable wrapper around https://github.com/open-xml-templating/
 1) npm install -g pkg
 2) git clone git@github.com:dlarssonse/docx-generator
 3) cd docx-generator
-4) npm run-script build-all
+4) npm install
+5) npm run-script build-all
 
 ## Usage
 
