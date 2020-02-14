@@ -1,82 +1,122 @@
 const docxtemplater = require('docxtemplater');
 const fs = require('fs');
-const JSZip = require('jszip');
+const PizZip = require('pizzip');
 
 var dstFile = 'example/destination.docx';
-var srcFile = 'example/source.docx';
 var datFile = 'example/data.json';
 var argv = require('minimist')(process.argv.slice(2));
 
 /** Should we run example? Else run main() */
-if (!example())
-    main();
+if (!example()) main();
 
 /**
- * 
+ *
  */
 function example() {
-    for(var key in argv) {
-        switch(key) {
-            case 'example': {
-                createDocument(srcFile, dstFile, datFile);
-                return true;
-            }
-        }
+  for (var key in argv) {
+    switch (key) {
+      case 'example': {
+        createDocument(srcFile, dstFile, datFile);
+        return true;
+      }
     }
-    return false;
+  }
+  return false;
 }
 
-
 /**
- * 
+ *
  */
 function main() {
-    dstFile = '';
-    srcFile = '';
-    datFile = '';
-    if (argv['d']) dstFile = argv['d'];
-    if (argv['s']) srcFile = argv['s'];
-    if (argv['_'] && argv['_'].length > 0) datFile = argv['_'][0];
+  dstFile = '';
+  datFile = '';
+  if (argv['d']) dstFile = argv['d'];
+  if (argv['_'] && argv['_'].length > 0) datFile = argv['_'][0];
 
-    if (dstFile !== '' && srcFile !== '' && datFile !== '') {
-        createDocument(srcFile, dstFile, datFile);
-        return;
-    } else {
-        console.log('Usage: -s source.docx -d destination.docx data.json');
-        return;
-    }
+  if (dstFile !== '' && datFile !== '') {
+    createDocument(dstFile, datFile);
+    return;
+  } else {
+    console.log('Usage: -s source.docx -d destination.docx data.json');
+    return;
+  }
 }
 
 /**
  * createDocument creates a file
- * @param {*} srcFile 
- * @param {*} dstFile 
- * @param {*} datFile 
+ * @param {*} dstFile
+ * @param {*} datFile
  */
-function createDocument(srcFile, dstFile, datFile) {
-    fs.copyFile(srcFile, dstFile, (err) => {
-        if (err) throw err;
+function createDocument(dstFile, datFile) {
+  // Load file in docxtemplater.
+  var data = fs.readFileSync(datFile);
 
-        // Load file in docxtemplater.
-        var content = fs.readFileSync(dstFile, 'binary');
-        var data = fs.readFileSync(datFile);
-        var zip = new JSZip(content);
-        var doc = new docxtemplater()
-        doc.loadZip(zip);
+  try {
+    content = fs.readFileSync(dstFile, 'binary');
+    let zip = new PizZip();
+    zip.load(content);
 
-        // Update documents
-        doc.setData(JSON.parse(data));
-
-        // Render document
-        try { doc.render(); } catch(error) { throw error; }
-
-        // Save file
-        try {
-            var buf = doc.getZip().generate({ type: 'nodebuffer' });
-            fs.writeFileSync(dstFile, buf);
-            console.log('Document saved as "' + dstFile + '".');
-        } catch(error) {
-            throw error;
+    doc = new docxtemplater();
+    doc.loadZip(zip).setOptions({
+      parser: tag => {
+        //console.log(tag);
+        let isoDate = false;
+        if (tag.endsWith('[isoDate]')) {
+          tag = tag.replace('[isoDate]', '');
+          isoDate = true;
         }
-    })
+        return {
+          ['get'](scope) {
+            console.log(`Checking tag ${tag}:`);
+            if (tag === '.') {
+              console.log('here' + tag);
+              return scope;
+            }
+            if (tag.indexOf('.') > -1) {
+              const tags = tag.split('.');
+              let result = scope;
+              for (let i = 0; i < tags.length; i++) {
+                if (result[tags[i]] === undefined) return undefined;
+                result = result[tags[i]];
+              }
+              if (isoDate) return result.toISOString().substring(0, 10);
+              return result;
+            }
+            if (isoDate) return scope[tag].toISOString().substring(0, 10);
+            return scope[tag];
+          }
+        };
+      }
+    });
+
+    // Update documents
+    try {
+      doc.setData(JSON.parse(data));
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+
+    // Render document
+    try {
+      doc.render();
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+
+    // Save file
+    try {
+      var buf = doc.getZip().generate({ type: 'nodebuffer' });
+      fs.writeFileSync(dstFile, buf);
+      console.log('Document saved as ' + dstFile);
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+  } catch (error) {
+    console.error(error);
+    return error;
+  }
+  return null;
 }
